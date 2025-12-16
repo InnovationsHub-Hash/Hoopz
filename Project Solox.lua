@@ -1,11 +1,3 @@
---[[
-    Project Solox - Basketball Legends Script
-    Version: 2.0
-]]
-
--- =============================================
--- ANTI-DETECTION & BYPASS SYSTEM
--- =============================================
 local function RandomDelay(min, max)
     min = min or 0.01
     max = max or 0.05
