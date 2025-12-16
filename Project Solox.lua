@@ -1,9 +1,6 @@
 --[[
     Project Solox - Basketball Legends Script
-    Version: 2.0 | Fully Undetected
-    Features: Auto Green, Ball Magnet, ESP, Speed Boost, Anti-AFK, Server Hop
-    
-    Anti-Detection: Randomized delays, spoofed calls, secure execution
+    Version: 2.0
 ]]
 
 -- =============================================
@@ -162,8 +159,8 @@ end
 -- =============================================
 local Window = Rayfield:CreateWindow({
     Name = "Project Solox | Basketball Legends",
-    LoadingTitle = "Project Solox v2.0",
-    LoadingSubtitle = "Initializing bypass...",
+    LoadingTitle = "Project Solox",
+    LoadingSubtitle = "",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "ProjectSolox",
@@ -288,7 +285,6 @@ end
 local BallModsTab = Window:CreateTab("Ball Mods", nil)
 
 BallModsTab:CreateSection("Auto Green")
-BallModsTab:CreateLabel("Timing assist for perfect shots!")
 
 local AutoGreenMode = "Perfect"
 local GoodValue = 0.9
@@ -508,7 +504,6 @@ BallModsTab:CreateToggle({
     end,
 })
 
-BallModsTab:CreateLabel("Auto faces the ball holder and guards!")
 BallModsTab:CreateDivider()
 
 -- Auto Rebound Section
@@ -536,8 +531,6 @@ BallModsTab:CreateToggle({
         end
     end,
 })
-
-BallModsTab:CreateLabel("Auto gets loose basketballs!")
 
 BallModsTab:CreateSection("Auto Steal")
 
@@ -761,8 +754,6 @@ PlayerTab:CreateSlider({
         RToTpDelay = Value
     end,
 })
-
-PlayerTab:CreateLabel("Press R to teleport forward!")
 
 -- =============================================
 -- TAB 3: ESP FEATURES
@@ -1139,18 +1130,6 @@ UtilityTab:CreateToggle({
                     end
                 end
             end)
-            
-            Rayfield:Notify({
-                Title = "Anti-AFK Enabled",
-                Content = "You will no longer be kicked for being idle!",
-                Duration = 3,
-            })
-        else
-            Rayfield:Notify({
-                Title = "Anti-AFK Disabled",
-                Content = "AFK protection turned off.",
-                Duration = 3,
-            })
         end
     end,
 })
@@ -1177,8 +1156,6 @@ UtilityTab:CreateDropdown({
     end,
 })
 
-UtilityTab:CreateLabel("Prevents being kicked for inactivity!")
-
 -- Server Hop Section
 UtilityTab:CreateSection("Server Hop")
 
@@ -1187,12 +1164,6 @@ local ServerHopMethod = "Random"
 UtilityTab:CreateButton({
     Name = "Server Hop (Random)",
     Callback = function()
-        Rayfield:Notify({
-            Title = "Server Hop",
-            Content = "Finding a new server...",
-            Duration = 3,
-        })
-        
         task.spawn(function()
             local success, servers = pcall(function()
                 local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
@@ -1210,12 +1181,6 @@ UtilityTab:CreateButton({
                 if #validServers > 0 then
                     local targetServer = validServers[math.random(1, #validServers)]
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServer)
-                else
-                    Rayfield:Notify({
-                        Title = "Server Hop Failed",
-                        Content = "No available servers found!",
-                        Duration = 3,
-                    })
                 end
             else
                 -- Fallback: Simple rejoin
@@ -1228,12 +1193,6 @@ UtilityTab:CreateButton({
 UtilityTab:CreateButton({
     Name = "Server Hop (Lowest Players)",
     Callback = function()
-        Rayfield:Notify({
-            Title = "Server Hop",
-            Content = "Finding server with lowest players...",
-            Duration = 3,
-        })
-        
         task.spawn(function()
             local success, servers = pcall(function()
                 local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
@@ -1252,11 +1211,6 @@ UtilityTab:CreateButton({
                 end
                 
                 if lowestServer then
-                    Rayfield:Notify({
-                        Title = "Server Found",
-                        Content = "Joining server with " .. lowestPlayers .. " players...",
-                        Duration = 2,
-                    })
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, lowestServer)
                 else
                     TeleportService:Teleport(game.PlaceId)
@@ -1271,12 +1225,6 @@ UtilityTab:CreateButton({
 UtilityTab:CreateButton({
     Name = "Server Hop (Most Players)",
     Callback = function()
-        Rayfield:Notify({
-            Title = "Server Hop",
-            Content = "Finding server with most players...",
-            Duration = 3,
-        })
-        
         task.spawn(function()
             local success, servers = pcall(function()
                 local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
@@ -1295,11 +1243,6 @@ UtilityTab:CreateButton({
                 end
                 
                 if highestServer then
-                    Rayfield:Notify({
-                        Title = "Server Found",
-                        Content = "Joining server with " .. highestPlayers .. " players...",
-                        Duration = 2,
-                    })
                     TeleportService:TeleportToPlaceInstance(game.PlaceId, highestServer)
                 else
                     TeleportService:Teleport(game.PlaceId)
@@ -1314,11 +1257,6 @@ UtilityTab:CreateButton({
 UtilityTab:CreateButton({
     Name = "Rejoin Current Game",
     Callback = function()
-        Rayfield:Notify({
-            Title = "Rejoin",
-            Content = "Rejoining the same server...",
-            Duration = 2,
-        })
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
     end,
 })
@@ -1332,17 +1270,6 @@ UtilityTab:CreateButton({
     Callback = function()
         if setclipboard then
             setclipboard(game.JobId)
-            Rayfield:Notify({
-                Title = "Copied!",
-                Content = "Server ID copied to clipboard.",
-                Duration = 2,
-            })
-        else
-            Rayfield:Notify({
-                Title = "Error",
-                Content = "Clipboard not supported.",
-                Duration = 2,
-            })
         end
     end,
 })
@@ -1353,16 +1280,9 @@ UtilityTab:CreateButton({
         if setclipboard then
             local link = "https://www.roblox.com/games/" .. game.PlaceId
             setclipboard(link)
-            Rayfield:Notify({
-                Title = "Copied!",
-                Content = "Game link copied to clipboard.",
-                Duration = 2,
-            })
         end
     end,
 })
-
-UtilityTab:CreateLabel("Server: " .. string.sub(game.JobId, 1, 8) .. "...")
 
 -- =============================================
 -- INPUT HANDLING
@@ -1427,16 +1347,4 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
--- =============================================
--- FINAL NOTIFICATIONS
--- =============================================
-Rayfield:Notify({
-    Title = "Project Solox v2.0 Loaded",
-    Content = "All features ready! Bypass active.",
-    Duration = 5,
-    Image = nil,
-})
-
-print("[Project Solox v2.0] Script loaded successfully!")
-print("[Project Solox] Session ID: " .. ScriptIdentity.SessionID)
-print("[Project Solox] Anti-detection bypass: ACTIVE")
+print("[Project Solox] Loaded")
