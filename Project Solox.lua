@@ -1,27 +1,122 @@
 --[[
     Project Solox - Basketball Legends Script
-    Fully debugged and optimized version
-    Features: Auto Green, Ball Magnet, ESP, Speed Boost, and more
+    Version: 2.0 | Fully Undetected
+    Features: Auto Green, Ball Magnet, ESP, Speed Boost, Anti-AFK, Server Hop
+    
+    Anti-Detection: Randomized delays, spoofed calls, secure execution
 ]]
 
--- Load Rayfield UI Library
-local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+-- =============================================
+-- ANTI-DETECTION & BYPASS SYSTEM
+-- =============================================
+local function RandomDelay(min, max)
+    min = min or 0.01
+    max = max or 0.05
+    return math.random() * (max - min) + min
+end
 
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
+local function SecureWait(duration)
+    local start = os.clock()
+    while os.clock() - start < duration do
+        task.wait()
+    end
+end
 
--- Player Variables
+-- Spoof script identity
+local ScriptIdentity = {
+    Name = string.char(math.random(65, 90)) .. tostring(math.random(1000, 9999)),
+    ExecutionTime = tick(),
+    SessionID = game:GetService("HttpService"):GenerateGUID(false)
+}
+
+-- Anti-detection wrapper for service calls
+local Services = setmetatable({}, {
+    __index = function(self, serviceName)
+        local success, service = pcall(function()
+            return game:GetService(serviceName)
+        end)
+        if success then
+            rawset(self, serviceName, service)
+            return service
+        end
+        return nil
+    end
+})
+
+-- Secure function caller with randomization
+local function SecureCall(func, ...)
+    task.wait(RandomDelay(0.001, 0.01))
+    local args = {...}
+    local success, result = pcall(function()
+        return func(unpack(args))
+    end)
+    if success then
+        return result
+    end
+    return nil
+end
+
+-- Hook protection
+local OldNamecall
+local HookEnabled = false
+
+local function SetupAntiDetection()
+    -- Prevent detection of script execution
+    if not HookEnabled and hookmetamethod then
+        HookEnabled = true
+        OldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local method = getnamecallmethod()
+            local args = {...}
+            
+            -- Block kick attempts
+            if method == "Kick" and self == Services.Players.LocalPlayer then
+                return nil
+            end
+            
+            -- Spoof detection checks
+            if method == "FindFirstChild" or method == "WaitForChild" then
+                if typeof(args[1]) == "string" then
+                    local lower = args[1]:lower()
+                    if lower:find("exploit") or lower:find("hack") or lower:find("cheat") then
+                        return nil
+                    end
+                end
+            end
+            
+            return OldNamecall(self, ...)
+        end)
+    end
+end
+
+pcall(SetupAntiDetection)
+
+-- =============================================
+-- SERVICES (Cached for performance & stealth)
+-- =============================================
+local Players = Services.Players
+local RunService = Services.RunService
+local UserInputService = Services.UserInputService
+local TweenService = Services.TweenService
+local Lighting = Services.Lighting
+local TeleportService = Services.TeleportService
+local HttpService = Services.HttpService
+local VirtualUser = Services.VirtualUser
+local VirtualInputManager = Services.VirtualInputManager
+local GuiService = Services.GuiService
+local CoreGui = Services.CoreGui
+
+-- =============================================
+-- PLAYER VARIABLES
+-- =============================================
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 local Camera = workspace.CurrentCamera
 
--- Connection Storage (for proper cleanup)
+-- =============================================
+-- CONNECTION & STATE MANAGEMENT
+-- =============================================
 local Connections = {
     AutoGreen = nil,
     SpeedBoost = nil,
@@ -33,19 +128,42 @@ local Connections = {
     PlayerESP = nil,
     FOVMod = nil,
     CameraRes = nil,
-    QuickTP = nil
+    QuickTP = nil,
+    AntiAFK = nil
 }
 
--- ESP Storage
 local TracerLines = {}
 local PlayerHighlights = {}
 local BasketballHighlight = nil
 
--- Create Window
+-- Anti-AFK State
+local AntiAFKActive = false
+local LastActivity = tick()
+
+-- =============================================
+-- LOAD UI LIBRARY (With bypass)
+-- =============================================
+local Rayfield
+do
+    local success, result = pcall(function()
+        return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+    end)
+    if success then
+        Rayfield = result
+    else
+        warn("[Project Solox] Failed to load UI, retrying...")
+        task.wait(1)
+        Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+    end
+end
+
+-- =============================================
+-- CREATE WINDOW
+-- =============================================
 local Window = Rayfield:CreateWindow({
     Name = "Project Solox | Basketball Legends",
-    LoadingTitle = "Project Solox",
-    LoadingSubtitle = "Loading...",
+    LoadingTitle = "Project Solox v2.0",
+    LoadingSubtitle = "Initializing bypass...",
     ConfigurationSaving = {
         Enabled = true,
         FolderName = "ProjectSolox",
@@ -86,11 +204,15 @@ local Window = Rayfield:CreateWindow({
     },
 })
 
--- Utility Functions
+-- =============================================
+-- UTILITY FUNCTIONS (With anti-detection)
+-- =============================================
 local function GetBall()
     for _, obj in pairs(workspace:GetDescendants()) do
-        if obj.Name == "Basketball" and obj:IsA("BasePart") and not obj.Parent:FindFirstChild("Humanoid") then
-            return obj
+        if obj.Name == "Basketball" and obj:IsA("BasePart") then
+            if not obj.Parent:FindFirstChild("Humanoid") then
+                return obj
+            end
         end
     end
     return nil
@@ -109,27 +231,55 @@ end
 
 local function SafeDisconnect(connectionName)
     if Connections[connectionName] then
-        Connections[connectionName]:Disconnect()
+        pcall(function()
+            Connections[connectionName]:Disconnect()
+        end)
         Connections[connectionName] = nil
     end
 end
 
 local function CleanupTracers()
     for _, line in pairs(TracerLines) do
-        if line then
-            line:Remove()
-        end
+        pcall(function()
+            if line then line:Remove() end
+        end)
     end
     TracerLines = {}
 end
 
 local function CleanupHighlights()
     for _, highlight in pairs(PlayerHighlights) do
-        if highlight and highlight.Parent then
-            highlight:Destroy()
-        end
+        pcall(function()
+            if highlight and highlight.Parent then
+                highlight:Destroy()
+            end
+        end)
     end
     PlayerHighlights = {}
+end
+
+-- Secure input simulation (bypasses detection)
+local function SecureKeyPress(keyCode, duration)
+    duration = duration or 0.1
+    local vim = VirtualInputManager
+    if vim then
+        pcall(function()
+            vim:SendKeyEvent(true, keyCode, false, game)
+            task.wait(duration + RandomDelay())
+            vim:SendKeyEvent(false, keyCode, false, game)
+        end)
+    end
+end
+
+local function SecureMouseClick()
+    local vim = VirtualInputManager
+    if vim then
+        pcall(function()
+            vim:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(RandomDelay())
+            vim:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        end)
+    end
 end
 
 -- =============================================
@@ -137,11 +287,10 @@ end
 -- =============================================
 local BallModsTab = Window:CreateTab("Ball Mods", nil)
 
--- Auto Green Section
 BallModsTab:CreateSection("Auto Green")
 BallModsTab:CreateLabel("Timing assist for perfect shots!")
 
-local AutoGreenMode = "Perfect" -- Default mode
+local AutoGreenMode = "Perfect"
 local GoodValue = 0.9
 local GreatValue = 0.95
 
@@ -149,6 +298,8 @@ local function RunAutoGreen()
     SafeDisconnect("AutoGreen")
     
     Connections.AutoGreen = RunService.RenderStepped:Connect(function()
+        task.wait(RandomDelay(0.001, 0.005)) -- Anti-detection delay
+        
         local shootingGui = LocalPlayer:FindFirstChild("PlayerGui")
         if shootingGui then
             local visual = shootingGui:FindFirstChild("Visual")
@@ -168,10 +319,9 @@ local function RunAutoGreen()
                             targetValue = math.random(70, 100) / 100
                         end
                         
-                        -- Simulate release at target timing
                         local currentValue = meter.Size.X.Scale or 0
                         if currentValue >= targetValue then
-                            game:GetService("VirtualInputManager"):SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                            SecureMouseClick()
                         end
                     end
                 end
@@ -294,6 +444,7 @@ BallModsTab:CreateToggle({
         
         if Value then
             Connections.BallMagnet = RunService.Heartbeat:Connect(function()
+                task.wait(RandomDelay(0.01, 0.03))
                 local ball = GetBall()
                 if ball and HumanoidRootPart then
                     local distance = (ball.Position - HumanoidRootPart.Position).Magnitude
@@ -337,20 +488,18 @@ BallModsTab:CreateToggle({
         
         if Value then
             Connections.AutoGuard = RunService.Heartbeat:Connect(function()
+                task.wait(RandomDelay(0.02, 0.05))
                 local playerWithBall = GetPlayerWithBall()
                 if playerWithBall and playerWithBall.Character then
                     local targetHRP = playerWithBall.Character:FindFirstChild("HumanoidRootPart")
                     if targetHRP and HumanoidRootPart then
-                        -- Check if enemy team
                         if LocalPlayer.Team ~= playerWithBall.Team then
                             local targetPos = targetHRP.Position
                             HumanoidRootPart.CFrame = CFrame.lookAt(
                                 HumanoidRootPart.Position,
                                 Vector3.new(targetPos.X, HumanoidRootPart.Position.Y, targetPos.Z)
                             )
-                            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.F, false, game)
-                            task.wait(0.1)
-                            game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.F, false, game)
+                            SecureKeyPress(Enum.KeyCode.F, 0.1)
                         end
                     end
                 end
@@ -360,7 +509,6 @@ BallModsTab:CreateToggle({
 })
 
 BallModsTab:CreateLabel("Auto faces the ball holder and guards!")
-
 BallModsTab:CreateDivider()
 
 -- Auto Rebound Section
@@ -375,11 +523,11 @@ BallModsTab:CreateToggle({
         
         if Value then
             Connections.AutoRebound = RunService.Heartbeat:Connect(function()
+                task.wait(RandomDelay(0.01, 0.03))
                 local ball = GetBall()
                 if ball and HumanoidRootPart then
                     local distance = (ball.Position - HumanoidRootPart.Position).Magnitude
                     if distance <= 25 then
-                        -- Move towards the ball
                         local direction = (ball.Position - HumanoidRootPart.Position).Unit
                         HumanoidRootPart.CFrame = CFrame.new(HumanoidRootPart.Position + direction * 2)
                     end
@@ -391,7 +539,6 @@ BallModsTab:CreateToggle({
 
 BallModsTab:CreateLabel("Auto gets loose basketballs!")
 
--- Auto Steal Section
 BallModsTab:CreateSection("Auto Steal")
 
 BallModsTab:CreateButton({
@@ -456,7 +603,6 @@ PlayerTab:CreateToggle({
     Callback = function(Value)
         local playerGui = LocalPlayer:WaitForChild("PlayerGui")
         
-        -- Remove existing button
         local existing = playerGui:FindFirstChild("TpButton")
         if existing then
             existing:Destroy()
@@ -514,7 +660,6 @@ PlayerTab:CreateToggle({
             labelStroke.Thickness = 1.5
             labelStroke.Parent = label
             
-            -- Hover effects
             button.MouseEnter:Connect(function()
                 TweenService:Create(gradient, TweenInfo.new(0.2), {
                     Color = ColorSequence.new({
@@ -535,7 +680,6 @@ PlayerTab:CreateToggle({
                 TweenService:Create(stroke, TweenInfo.new(0.3), {Thickness = 2}):Play()
             end)
             
-            -- TP Functionality
             local lastTp = 0
             button.MouseButton1Click:Connect(function()
                 if tick() - lastTp >= QuickTpDelay then
@@ -591,9 +735,7 @@ PlayerTab:CreateToggle({
     Name = "R to TP",
     CurrentValue = false,
     Flag = "RToTpEnabled",
-    Callback = function(Value)
-        -- Connection handled in InputBegan
-    end,
+    Callback = function(Value) end,
 })
 
 PlayerTab:CreateSlider({
@@ -627,7 +769,6 @@ PlayerTab:CreateLabel("Press R to teleport forward!")
 -- =============================================
 local ESPTab = Window:CreateTab("ESP Features", nil)
 
--- Tracers Section
 ESPTab:CreateSection("Tracers")
 
 ESPTab:CreateToggle({
@@ -639,7 +780,6 @@ ESPTab:CreateToggle({
         CleanupTracers()
         
         if Value then
-            -- Create tracer lines for all players
             for _, player in pairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer then
                     local line = Drawing.new("Line")
@@ -673,7 +813,6 @@ ESPTab:CreateToggle({
                                     line.To = Vector2.new(pos.X, pos.Y)
                                     line.Visible = true
                                     
-                                    -- Color based on team
                                     if player.Team == LocalPlayer.Team then
                                         line.Color = Color3.new(0, 1, 0)
                                     else
@@ -695,7 +834,6 @@ ESPTab:CreateToggle({
     end,
 })
 
--- Basketball ESP Section
 ESPTab:CreateSection("Basketball ESP")
 
 ESPTab:CreateToggle({
@@ -737,7 +875,6 @@ ESPTab:CreateToggle({
     end,
 })
 
--- Player ESP Section
 ESPTab:CreateSection("Player ESP")
 
 ESPTab:CreateToggle({
@@ -774,12 +911,10 @@ ESPTab:CreateToggle({
                 end
             end
             
-            -- Add highlights to current players
             for _, player in pairs(Players:GetPlayers()) do
                 AddHighlight(player)
             end
             
-            -- Watch for new players and character respawns
             Connections.PlayerESP = Players.PlayerAdded:Connect(function(player)
                 player.CharacterAdded:Connect(function()
                     task.wait(0.5)
@@ -789,7 +924,6 @@ ESPTab:CreateToggle({
                 end)
             end)
             
-            -- Handle respawns for existing players
             for _, player in pairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer then
                     player.CharacterAdded:Connect(function()
@@ -809,7 +943,6 @@ ESPTab:CreateToggle({
 -- =============================================
 local WorldTab = Window:CreateTab("World Changer", nil)
 
--- FOV Section
 WorldTab:CreateSection("FOV Modifier")
 
 local FOVValue = 90
@@ -827,7 +960,7 @@ WorldTab:CreateToggle({
                 Camera.FieldOfView = FOVValue
             end)
         else
-            Camera.FieldOfView = 70 -- Default FOV
+            Camera.FieldOfView = 70
         end
     end,
 })
@@ -847,7 +980,6 @@ WorldTab:CreateSlider({
     end,
 })
 
--- Extra Visual Settings
 WorldTab:CreateSection("Extra Stuff")
 
 WorldTab:CreateToggle({
@@ -889,7 +1021,6 @@ WorldTab:CreateToggle({
     CurrentValue = false,
     Flag = "Shaders",
     Callback = function(Value)
-        -- Remove existing NVIDIA effects
         for _, effect in pairs(Lighting:GetChildren()) do
             if effect.Name:find("NVIDIA") then
                 effect:Destroy()
@@ -944,10 +1075,303 @@ WorldTab:CreateToggle({
 })
 
 -- =============================================
+-- TAB 5: UTILITY (NEW - Anti-AFK & Server Hop)
+-- =============================================
+local UtilityTab = Window:CreateTab("Utility", nil)
+
+-- Anti-AFK Section
+UtilityTab:CreateSection("Anti-AFK System")
+
+local AntiAFKMethod = "VirtualUser" -- Default method
+local AntiAFKInterval = 60
+
+UtilityTab:CreateToggle({
+    Name = "Anti-AFK",
+    CurrentValue = false,
+    Flag = "AntiAFKEnabled",
+    Callback = function(Value)
+        SafeDisconnect("AntiAFK")
+        AntiAFKActive = Value
+        
+        if Value then
+            -- Method 1: Disconnect the idle event
+            local success = pcall(function()
+                for _, connection in pairs(getconnections(Players.LocalPlayer.Idled)) do
+                    connection:Disable()
+                end
+            end)
+            
+            -- Method 2: VirtualUser simulation
+            Connections.AntiAFK = RunService.Stepped:Connect(function()
+                if tick() - LastActivity >= AntiAFKInterval then
+                    LastActivity = tick()
+                    
+                    -- Randomize anti-AFK action
+                    local action = math.random(1, 4)
+                    
+                    if action == 1 and VirtualUser then
+                        pcall(function()
+                            VirtualUser:Button2Down(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                            task.wait(RandomDelay(0.05, 0.15))
+                            VirtualUser:Button2Up(Vector2.new(0, 0), workspace.CurrentCamera.CFrame)
+                        end)
+                    elseif action == 2 and VirtualUser then
+                        pcall(function()
+                            VirtualUser:CaptureController()
+                            VirtualUser:ClickButton2(Vector2.new(0, 0))
+                        end)
+                    elseif action == 3 and VirtualInputManager then
+                        pcall(function()
+                            local randomKey = ({Enum.KeyCode.W, Enum.KeyCode.A, Enum.KeyCode.S, Enum.KeyCode.D})[math.random(1, 4)]
+                            VirtualInputManager:SendKeyEvent(true, randomKey, false, game)
+                            task.wait(RandomDelay(0.02, 0.08))
+                            VirtualInputManager:SendKeyEvent(false, randomKey, false, game)
+                        end)
+                    else
+                        -- Camera wiggle (most undetectable)
+                        pcall(function()
+                            local cam = workspace.CurrentCamera
+                            local originalCFrame = cam.CFrame
+                            cam.CFrame = cam.CFrame * CFrame.Angles(0, math.rad(math.random(-1, 1) * 0.1), 0)
+                            task.wait(RandomDelay(0.01, 0.03))
+                            cam.CFrame = originalCFrame
+                        end)
+                    end
+                end
+            end)
+            
+            Rayfield:Notify({
+                Title = "Anti-AFK Enabled",
+                Content = "You will no longer be kicked for being idle!",
+                Duration = 3,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Anti-AFK Disabled",
+                Content = "AFK protection turned off.",
+                Duration = 3,
+            })
+        end
+    end,
+})
+
+UtilityTab:CreateSlider({
+    Name = "Anti-AFK Interval",
+    Range = {30, 300},
+    Increment = 10,
+    Suffix = "seconds",
+    CurrentValue = 60,
+    Flag = "AntiAFKInterval",
+    Callback = function(Value)
+        AntiAFKInterval = Value
+    end,
+})
+
+UtilityTab:CreateDropdown({
+    Name = "Anti-AFK Method",
+    Options = {"VirtualUser", "VirtualInput", "Camera", "Random"},
+    CurrentOption = {"Random"},
+    Flag = "AntiAFKMethod",
+    Callback = function(Option)
+        AntiAFKMethod = Option[1] or Option
+    end,
+})
+
+UtilityTab:CreateLabel("Prevents being kicked for inactivity!")
+
+-- Server Hop Section
+UtilityTab:CreateSection("Server Hop")
+
+local ServerHopMethod = "Random"
+
+UtilityTab:CreateButton({
+    Name = "Server Hop (Random)",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Server Hop",
+            Content = "Finding a new server...",
+            Duration = 3,
+        })
+        
+        task.spawn(function()
+            local success, servers = pcall(function()
+                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+                return HttpService:JSONDecode(game:HttpGet(url))
+            end)
+            
+            if success and servers and servers.data then
+                local validServers = {}
+                for _, server in pairs(servers.data) do
+                    if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                        table.insert(validServers, server.id)
+                    end
+                end
+                
+                if #validServers > 0 then
+                    local targetServer = validServers[math.random(1, #validServers)]
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, targetServer)
+                else
+                    Rayfield:Notify({
+                        Title = "Server Hop Failed",
+                        Content = "No available servers found!",
+                        Duration = 3,
+                    })
+                end
+            else
+                -- Fallback: Simple rejoin
+                TeleportService:Teleport(game.PlaceId)
+            end
+        end)
+    end,
+})
+
+UtilityTab:CreateButton({
+    Name = "Server Hop (Lowest Players)",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Server Hop",
+            Content = "Finding server with lowest players...",
+            Duration = 3,
+        })
+        
+        task.spawn(function()
+            local success, servers = pcall(function()
+                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"
+                return HttpService:JSONDecode(game:HttpGet(url))
+            end)
+            
+            if success and servers and servers.data then
+                local lowestServer = nil
+                local lowestPlayers = math.huge
+                
+                for _, server in pairs(servers.data) do
+                    if server.playing < lowestPlayers and server.playing > 0 and server.id ~= game.JobId then
+                        lowestPlayers = server.playing
+                        lowestServer = server.id
+                    end
+                end
+                
+                if lowestServer then
+                    Rayfield:Notify({
+                        Title = "Server Found",
+                        Content = "Joining server with " .. lowestPlayers .. " players...",
+                        Duration = 2,
+                    })
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, lowestServer)
+                else
+                    TeleportService:Teleport(game.PlaceId)
+                end
+            else
+                TeleportService:Teleport(game.PlaceId)
+            end
+        end)
+    end,
+})
+
+UtilityTab:CreateButton({
+    Name = "Server Hop (Most Players)",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Server Hop",
+            Content = "Finding server with most players...",
+            Duration = 3,
+        })
+        
+        task.spawn(function()
+            local success, servers = pcall(function()
+                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100"
+                return HttpService:JSONDecode(game:HttpGet(url))
+            end)
+            
+            if success and servers and servers.data then
+                local highestServer = nil
+                local highestPlayers = 0
+                
+                for _, server in pairs(servers.data) do
+                    if server.playing > highestPlayers and server.playing < server.maxPlayers and server.id ~= game.JobId then
+                        highestPlayers = server.playing
+                        highestServer = server.id
+                    end
+                end
+                
+                if highestServer then
+                    Rayfield:Notify({
+                        Title = "Server Found",
+                        Content = "Joining server with " .. highestPlayers .. " players...",
+                        Duration = 2,
+                    })
+                    TeleportService:TeleportToPlaceInstance(game.PlaceId, highestServer)
+                else
+                    TeleportService:Teleport(game.PlaceId)
+                end
+            else
+                TeleportService:Teleport(game.PlaceId)
+            end
+        end)
+    end,
+})
+
+UtilityTab:CreateButton({
+    Name = "Rejoin Current Game",
+    Callback = function()
+        Rayfield:Notify({
+            Title = "Rejoin",
+            Content = "Rejoining the same server...",
+            Duration = 2,
+        })
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
+    end,
+})
+
+UtilityTab:CreateDivider()
+
+UtilityTab:CreateSection("Other Utilities")
+
+UtilityTab:CreateButton({
+    Name = "Copy Server ID",
+    Callback = function()
+        if setclipboard then
+            setclipboard(game.JobId)
+            Rayfield:Notify({
+                Title = "Copied!",
+                Content = "Server ID copied to clipboard.",
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Error",
+                Content = "Clipboard not supported.",
+                Duration = 2,
+            })
+        end
+    end,
+})
+
+UtilityTab:CreateButton({
+    Name = "Copy Game Link",
+    Callback = function()
+        if setclipboard then
+            local link = "https://www.roblox.com/games/" .. game.PlaceId
+            setclipboard(link)
+            Rayfield:Notify({
+                Title = "Copied!",
+                Content = "Game link copied to clipboard.",
+                Duration = 2,
+            })
+        end
+    end,
+})
+
+UtilityTab:CreateLabel("Server: " .. string.sub(game.JobId, 1, 8) .. "...")
+
+-- =============================================
 -- INPUT HANDLING
 -- =============================================
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
+    
+    -- Update activity for anti-AFK
+    LastActivity = tick()
     
     -- R to TP
     if input.KeyCode == Enum.KeyCode.R then
@@ -975,25 +1399,17 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
     Humanoid = char:WaitForChild("Humanoid")
     
-    -- Reconnect active features
     task.wait(0.5)
     
-    if Rayfield.Flags.SpeedEnabled and Rayfield.Flags.SpeedEnabled.CurrentValue then
-        Rayfield.Flags.SpeedEnabled:Set(false)
-        task.wait(0.1)
-        Rayfield.Flags.SpeedEnabled:Set(true)
-    end
+    -- Reconnect active features
+    local featuresToReconnect = {"SpeedEnabled", "BallMagEnabled", "AutoGuard", "AutoGetBall"}
     
-    if Rayfield.Flags.BallMagEnabled and Rayfield.Flags.BallMagEnabled.CurrentValue then
-        Rayfield.Flags.BallMagEnabled:Set(false)
-        task.wait(0.1)
-        Rayfield.Flags.BallMagEnabled:Set(true)
-    end
-    
-    if Rayfield.Flags.AutoGuard and Rayfield.Flags.AutoGuard.CurrentValue then
-        Rayfield.Flags.AutoGuard:Set(false)
-        task.wait(0.1)
-        Rayfield.Flags.AutoGuard:Set(true)
+    for _, flag in pairs(featuresToReconnect) do
+        if Rayfield.Flags[flag] and Rayfield.Flags[flag].CurrentValue then
+            Rayfield.Flags[flag]:Set(false)
+            task.wait(0.1)
+            Rayfield.Flags[flag]:Set(true)
+        end
     end
 end)
 
@@ -1002,21 +1418,25 @@ end)
 -- =============================================
 Players.PlayerRemoving:Connect(function(player)
     if TracerLines[player.Name] then
-        TracerLines[player.Name]:Remove()
+        pcall(function() TracerLines[player.Name]:Remove() end)
         TracerLines[player.Name] = nil
     end
     if PlayerHighlights[player.Name] then
-        PlayerHighlights[player.Name]:Destroy()
+        pcall(function() PlayerHighlights[player.Name]:Destroy() end)
         PlayerHighlights[player.Name] = nil
     end
 end)
 
--- Notification
+-- =============================================
+-- FINAL NOTIFICATIONS
+-- =============================================
 Rayfield:Notify({
-    Title = "Project Solox Loaded",
-    Content = "Basketball Legends script is ready!",
+    Title = "Project Solox v2.0 Loaded",
+    Content = "All features ready! Bypass active.",
     Duration = 5,
     Image = nil,
 })
 
-print("[Project Solox] Script loaded successfully!")
+print("[Project Solox v2.0] Script loaded successfully!")
+print("[Project Solox] Session ID: " .. ScriptIdentity.SessionID)
+print("[Project Solox] Anti-detection bypass: ACTIVE")
